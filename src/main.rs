@@ -12,7 +12,9 @@ use std::time::Duration;
 use std::env;
 use tokio::sync::mpsc;
 use std::io;
-use std::sync::mpsc::Receiver;
+use std::io::Write;
+use azalea::Item::String;
+use azalea::protocol::packets::game::ClientboundGamePacket;
 
 #[tokio::main]
 async fn main() {
@@ -31,6 +33,8 @@ async fn main() {
     let state = State{
         rin
     };
+
+
 
     loop {
         let e = ClientBuilder::new()
@@ -56,6 +60,12 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                 }
                 _ => {}
             }
+        }
+        Event::Packet(p) => match p {
+            ClientboundGamePacket::Disconnect(d) => {
+                write_stdin("end")
+            }
+            _ => {}
         }
         Event::Login => {
             let a = &bot.profile.name;
@@ -225,4 +235,14 @@ fn read_stdin() -> mpsc::Receiver<String> {
     });
 
     return rx
+}
+
+fn write_stdin(s: String) {
+    let res = format!("{}\n",s);
+    //io::stdout().write_all(String::format())
+}
+
+fn write_json_stdin(s: String, json: String) {
+    let res = format!("{} {}\n",s,json);
+    //io::stdout().write_all(String::format())
 }
