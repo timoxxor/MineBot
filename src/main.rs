@@ -12,8 +12,7 @@ use std::time::Duration;
 use std::env;
 use tokio::sync::mpsc;
 use std::io;
-use std::io::Write;
-use azalea::Item::String;
+use std::sync::Arc;
 use azalea::protocol::packets::game::ClientboundGamePacket;
 
 #[tokio::main]
@@ -30,40 +29,34 @@ async fn main() {
     // or Account::microsoft("example@example.com").await.unwrap();
 
     let rin = read_stdin();
-    let state = State{
-        rin
+    let state = State {
+        rin: rin
     };
 
-
-
-    loop {
-        let e = ClientBuilder::new()
-            .set_handler(handle)
-            .set_state(state.clone())
-            .start(account.clone(), &**ip)
-            .await;
-        eprintln!("{:?}", e);
-    }
+    let e = ClientBuilder::new()
+        .set_handler(handle)
+        .set_state(state)
+        .start(account.clone(), &**ip)
+        .await;
+    eprintln!("{:?}", e);
 }
 
-#[derive(Default, Clone, Component)]
+#[derive(Default,Clone,Component)]
 pub struct State {
-    rin: mpsc::Receiver<String>
+    rin: mpsc::Receiver<String>,
 }
 
 async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Result<()> {
     match event {
         Event::Init => {
             match state.rin.try_recv() {
-                Ok(s) => {
-
-                }
+                Ok(s) => {}
                 _ => {}
             }
         }
-        Event::Packet(p) => match p {
+        Event::Packet(p) => match p.as_ref() {
             ClientboundGamePacket::Disconnect(d) => {
-                write_stdin("end")
+                write_stdin(String::from("end"));
             }
             _ => {}
         }
@@ -84,7 +77,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                 bot.disconnect();
             }
             let Some(sender) = m.username() else {
-                return Ok(())
+                return Ok(());
             };
             // let mut ecs = bot.ecs.lock();
             // let entity = bot
@@ -94,7 +87,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
             //     .iter(&mut ecs)
             //     .find(|e| e.name() == Some(sender));
             // let entity = bot.entity_by::<With<Player>>(|name: &Name| name == sender);
-            let entity = bot.entity_by::<With<Player>, (&GameProfileComponent,)>(
+            let entity = bot.entity_by::<With<Player>, (&GameProfileComponent, )>(
                 |profile: &&GameProfileComponent| {
                     println!("entity {profile:?}");
                     profile.name == sender
@@ -105,11 +98,11 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                 match m.content().as_str() {
                     "whereami" => {
                         let pos = bot.entity_component::<Position>(entity);
-                        bot.chat(&format!("You're at {pos:?}",));
+                        bot.chat(&format!("You're at {pos:?}", ));
                     }
                     "whereareyou" => {
                         let pos = bot.position();
-                        bot.chat(&format!("I'm at {pos:?}",));
+                        bot.chat(&format!("I'm at {pos:?}", ));
                     }
                     "goto" => {
                         let entity_pos = bot.entity_component::<Position>(entity);
@@ -137,9 +130,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                     "lag" => {
                         std::thread::sleep(Duration::from_millis(1000));
                     }
-                    "sethome" => {
-
-                    }
+                    "sethome" => {}
                     "inventory" => {
                         println!("inventory: {:?}", bot.menu());
                     }
@@ -148,7 +139,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                             .world()
                             .read()
                             .find_block(bot.position(), &azalea::Block::DiamondBlock.into());
-                        bot.chat(&format!("target_pos: {target_pos:?}",));
+                        bot.chat(&format!("target_pos: {target_pos:?}", ));
                     }
                     "gotoblock" => {
                         let target_pos = bot
@@ -169,7 +160,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                             .find_block(bot.position(), &azalea::Block::Lever.into());
                         let Some(target_pos) = target_pos else {
                             bot.chat("no lever found");
-                            return Ok(())
+                            return Ok(());
                         };
                         bot.goto(BlockPosGoal::from(target_pos));
                         bot.look_at(target_pos.center());
@@ -177,7 +168,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                     }
                     "hitresult" => {
                         let hit_result = bot.get_component::<HitResultComponent>();
-                        bot.chat(&format!("hit_result: {hit_result:?}",));
+                        bot.chat(&format!("hit_result: {hit_result:?}", ));
                     }
                     "chest" => {
                         let target_pos = bot
@@ -186,7 +177,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
                             .find_block(bot.position(), &azalea::Block::Chest.into());
                         let Some(target_pos) = target_pos else {
                             bot.chat("no chest found");
-                            return Ok(())
+                            return Ok(());
                         };
                         bot.look_at(target_pos.center());
                         let container = bot.open_container(target_pos).await;
@@ -215,9 +206,7 @@ async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Resu
     Ok(())
 }
 
-fn sethome(vec: Vec3){
-
-}
+fn sethome(vec: Vec3) {}
 
 fn read_stdin() -> mpsc::Receiver<String> {
     let (tx, mut rx) = mpsc::channel(100);
@@ -234,15 +223,15 @@ fn read_stdin() -> mpsc::Receiver<String> {
         }
     });
 
-    return rx
+    return rx;
 }
 
 fn write_stdin(s: String) {
-    let res = format!("{}\n",s);
+    let res = format!("{}\n", s);
     //io::stdout().write_all(String::format())
 }
 
 fn write_json_stdin(s: String, json: String) {
-    let res = format!("{} {}\n",s,json);
+    let res = format!("{} {}\n", s, json);
     //io::stdout().write_all(String::format())
 }
