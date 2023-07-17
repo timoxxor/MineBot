@@ -10,6 +10,9 @@ use azalea::{prelude::*, BlockPos, GameProfileComponent, WalkDirection, Vec3};
 use azalea::{Account, Client, Event};
 use std::time::Duration;
 use std::env;
+use tokio::sync::mpsc;
+use std::io;
+use std::sync::mpsc::Receiver;
 
 #[tokio::main]
 async fn main() {
@@ -24,9 +27,15 @@ async fn main() {
     let account = Account::offline(bot_name);
     // or Account::microsoft("example@example.com").await.unwrap();
 
+    let rin = read_stdin();
+    let state = State{
+        rin
+    };
+
     loop {
         let e = ClientBuilder::new()
             .set_handler(handle)
+            .set_state(state.clone())
             .start(account.clone(), &**ip)
             .await;
         eprintln!("{:?}", e);
@@ -34,10 +43,20 @@ async fn main() {
 }
 
 #[derive(Default, Clone, Component)]
-pub struct State {}
+pub struct State {
+    rin: mpsc::Receiver<String>
+}
 
-async fn handle(mut bot: Client, event: Event, state: State) -> anyhow::Result<()> {
+async fn handle(mut bot: Client, event: Event, mut state: State) -> anyhow::Result<()> {
     match event {
+        Event::Init => {
+            match state.rin.try_recv() {
+                Ok(s) => {
+
+                }
+                _ => {}
+            }
+        }
         Event::Login => {
             let a = &bot.profile.name;
             bot.chat(&*format!("/register {}ab", a));
@@ -188,4 +207,22 @@ async fn handle(mut bot: Client, event: Event, state: State) -> anyhow::Result<(
 
 fn sethome(vec: Vec3){
 
+}
+
+fn read_stdin() -> mpsc::Receiver<String> {
+    let (tx, mut rx) = mpsc::channel(100);
+
+    tokio::spawn(async move {
+        let mut res = String::new();
+        loop {
+            match io::stdin().read_line(&mut res) {
+                Ok(s) => {
+                    tx.send(res.clone())
+                }
+                Err(e) => {}
+            }
+        }
+    });
+
+    return rx
 }
